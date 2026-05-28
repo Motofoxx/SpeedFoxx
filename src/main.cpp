@@ -514,14 +514,7 @@ const char index_html[] PROGMEM = R"rawliteral(
                 <div class="control-panel-wrapper">
                     <h2>SF Dashboard Clusters</h2>
 
-                    <div class="control-section">
-                        <div class="cluster-group-title">Detailed Replicas</div>
-                        <div class="layout-grid">
-                            <div class="layout-card selected" id="lay-cbr600rr-detail" onclick="setLayout('cbr600rr-detail')">CBR600RR<span class="layout-tag">Detailed</span></div>
-                            <div class="layout-card" id="lay-ducati800-detail" onclick="setLayout('ducati800-detail')">800SS<span class="layout-tag">Detailed</span></div>
-                            <div class="layout-card" id="lay-gsxr600-detail" onclick="setLayout('gsxr600-detail')">GSX-R600<span class="layout-tag">Detailed</span></div>
-                        </div>
-                    </div>
+
 
                     <div class="control-section">
                         <div class="cluster-group-title">Generic / Extras</div>
@@ -641,7 +634,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         
         let liveData = { mph: 0, rpm: 0, gear: 'N', odo: 0.0, shift: 14500, flash: 50, stage: '', temp: 72, activeSim: false };
         let renderMph = 0, renderRpm = 0;
-        let currentLayout = 'cbr600rr-detail';
+        let currentLayout = 'gsxr25';
         let liveSprocketIndex = '1';
         let sprocketSelectionDirty = false;
         let localRaceRole = 'Solo';
@@ -967,134 +960,11 @@ const char index_html[] PROGMEM = R"rawliteral(
             }
         }
 
-        // --- DETAILED DASH: 2005 CBR600RR inspired ---
-        function renderCBR600RRDetailed() {
-            ctx.fillStyle = '#08080b';
-            ctx.fillRect(0, 0, 340, 340);
-            ctx.fillStyle = '#14141a';
-            ctx.fillRect(34, 50, 272, 210);
-            ctx.fillStyle = '#0a0a0d';
-            ctx.fillRect(56, 252, 228, 22);
 
-            drawIndicator(138, 34, 'N', liveData.gear === 'N', '#2eff64');
-            drawIndicator(170, 34, 'FI', false, '#ff3333');
-            drawIndicator(202, 34, 'OIL', false, '#ffcc00');
 
-            drawRoundGauge(102, 154, 70, 0, 180, renderMph, 'SPEED', 'mph', 20, 150);
-            drawRoundGauge(238, 154, 70, 0, 15, renderRpm / 1000, 'TACH', 'x1000', 1, 13);
 
-            ctx.fillStyle = '#1c211f';
-            ctx.fillRect(65, 214, 76, 26);
-            ctx.fillRect(200, 214, 76, 26);
-            ctx.fillStyle = '#78d6bd';
-            ctx.font = 'bold 14px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(liveData.odo.toFixed(1), 103, 231);
-            ctx.fillText(Math.round(renderRpm), 238, 231);
 
-            ctx.fillStyle = '#f5f5f5';
-            ctx.font = 'italic bold 17px sans-serif';
-            ctx.fillText('HONDO CBR600RR', 170, 294);
-            ctx.fillStyle = '#8e8e93';
-            ctx.font = 'bold 10px sans-serif';
-            ctx.fillText('DETAILED REPLICA - PARODY BADGE', 170, 310);
-        }
 
-        // --- DETAILED DASH: 2004-2005 Ducati 800SS inspired ---
-        function renderDucati800Detailed() {
-            ctx.fillStyle = '#07070a';
-            ctx.fillRect(0, 0, 340, 340);
-            ctx.fillStyle = '#17171d';
-            ctx.beginPath();
-            ctx.arc(113, 160, 88, 0, 2 * Math.PI);
-            ctx.arc(227, 160, 88, 0, 2 * Math.PI);
-            ctx.fill();
-            ctx.fillStyle = '#101015';
-            ctx.fillRect(146, 67, 48, 190);
-
-            drawIndicator(150, 70, 'N', liveData.gear === 'N', '#32ff63');
-            drawIndicator(190, 70, '!', liveData.activeSim && liveData.rpm >= liveData.shift, '#ff3030');
-            drawIndicator(170, 100, 'HI', false, '#5fb3ff');
-
-            drawRoundGauge(112, 164, 72, 0, 160, renderMph, 'VELOCITA', 'mph', 20, 130);
-            drawRoundGauge(228, 164, 72, 0, 11, renderRpm / 1000, 'GIRI', 'x1000', 1, 9);
-
-            ctx.fillStyle = '#171b18';
-            ctx.fillRect(77, 222, 70, 18);
-            ctx.fillRect(193, 222, 70, 18);
-            ctx.fillStyle = '#d0b46b';
-            ctx.font = 'bold 12px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(Math.round(renderMph) + ' MPH', 112, 235);
-            ctx.fillText(liveData.gear, 228, 235);
-
-            ctx.fillStyle = '#e7e7e7';
-            ctx.font = 'italic bold 18px serif';
-            ctx.fillText('DUCKATI 800SS', 170, 288);
-            ctx.fillStyle = '#9a9aa3';
-            ctx.font = 'bold 10px sans-serif';
-            ctx.fillText('TWIN POD ANALOG PARODY', 170, 305);
-        }
-
-        // --- DETAILED DASH: 1999 GSX-R600 inspired ---
-        function renderGSXR600Detailed() {
-            ctx.fillStyle = '#09090c';
-            ctx.fillRect(0, 0, 340, 340);
-            ctx.fillStyle = '#15151b';
-            ctx.beginPath();
-            ctx.moveTo(35, 112);
-            ctx.quadraticCurveTo(170, 28, 305, 112);
-            ctx.lineTo(286, 252);
-            ctx.lineTo(54, 252);
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = '#2d2d36';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-
-            const cx = 170, cy = 176, r = 125;
-            const start = 1.08 * Math.PI, sweep = 0.86 * Math.PI;
-            for (let i = 3; i <= 15; i++) {
-                const a = start + ((i - 3) / 12) * sweep;
-                ctx.beginPath();
-                ctx.arc(cx, cy, r, a, a + 0.035 * Math.PI);
-                ctx.lineWidth = 12;
-                ctx.strokeStyle = i >= 13 ? '#d51f2a' : (i >= 10 ? '#d7aa34' : '#d8d8d8');
-                ctx.stroke();
-                ctx.fillStyle = i >= 14 ? '#d51f2a' : '#e8edf2';
-                ctx.font = 'bold 14px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(i, cx + (r - 28) * Math.cos(a), cy + (r - 28) * Math.sin(a));
-            }
-
-            const tachAngle = start + ((Math.min(renderRpm / 1000, 15) - 3) / 12) * sweep;
-            drawNeedle(cx, cy, tachAngle, 98, '#ff4a31', 4);
-
-            ctx.fillStyle = '#c9d6d2';
-            ctx.fillRect(84, 181, 172, 56);
-            ctx.strokeStyle = '#404846';
-            ctx.strokeRect(84, 181, 172, 56);
-            ctx.fillStyle = '#111';
-            ctx.font = 'bold 42px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(Math.round(renderMph), 158, 219);
-            ctx.font = 'bold 10px sans-serif';
-            ctx.fillText('mph', 220, 209);
-            ctx.fillText('GEAR ' + liveData.gear, 220, 226);
-
-            drawIndicator(50, 144, 'N', liveData.gear === 'N', '#2eff64');
-            drawIndicator(50, 176, 'HI', false, '#5fb3ff');
-            drawIndicator(290, 144, 'OIL', false, '#ffb000');
-            drawIndicator(290, 176, '!', liveData.activeSim && liveData.rpm >= liveData.shift, '#ff3030');
-
-            ctx.fillStyle = '#f5f5f5';
-            ctx.font = 'italic bold 17px sans-serif';
-            ctx.fillText('SOOZUKI GSX-R600', 170, 286);
-            ctx.fillStyle = '#8e8e93';
-            ctx.font = 'bold 10px sans-serif';
-            ctx.fillText('ARC TACH / LCD PARODY', 170, 303);
-        }
 
         // --- NEW DASH: 2025 Suzuki GSX-R1000 ---
         function renderGSXR2025() {
@@ -1358,10 +1228,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             if (isOverrev) masterPanel.classList.add('shift-flash-active');
             else masterPanel.classList.remove('shift-flash-active');
 
-            if(currentLayout === 'cbr600rr-detail') renderCBR600RRDetailed();
-            else if(currentLayout === 'ducati800-detail') renderDucati800Detailed();
-            else if(currentLayout === 'gsxr600-detail') renderGSXR600Detailed();
-            else if(currentLayout === 'gsxr25') renderGSXR2025();
+            if(currentLayout === 'gsxr25') renderGSXR2025();
             else if(currentLayout === 'zx10r26') renderZX10R2026();
             else if(currentLayout === 'lfa') renderLFAPod();
             else if(currentLayout === 's2000') renderS2000Dash();
