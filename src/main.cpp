@@ -1,10 +1,15 @@
 /**
  * ============================================================================
- * @file        MotoDash_Core.cpp
+ * @file        main.cpp
  * @brief       Motorcycle Telemetry Dashboard & Drag Racing Simulator
- * @version     1.1.0 (Includes 2025 GSX-R & 2026 ZX-10R Clusters)
- * @author      [Your Name/Company Name]
- * @date        [Current Date]
+ * @version     1.1.0
+ * @author      Motofoxx
+ * @date        2026-05-26
+ *
+ * @versioning
+ * - Major: breaking changes and new platform support
+ * - Minor: new features and UI improvements
+ * - Patch: small fixes and refinements
  *
  * @description
  * An embedded telemetric display system designed for the ESP32 platform.
@@ -58,15 +63,19 @@ const char* ssid = "SpeedFoxx_Network";
 const char* password = "motorcycle123";
 WebServer server(80);
 
-const int BUTTON_TOP = 2;   
-const int BUTTON_RIGHT = 0; 
-
-// SpeedFoxx prototype hardware map
+const char* FIRMWARE_VERSION = "1.1.1";
+const char* FIRMWARE_CHANGELOG = R"history([
+  {"version":"1.1.1","notes":"Fixed web portal rendering, added version display, and centralized large-gear styling."},
+  {"version":"1.1.0","notes":"Initial motorcycle gear dashboard, race pairing, and portal UI."}
+])history";
 const int PIN_SPEED_IN = 14;
 const int PIN_RPM_IN = 27;
 const int PIN_NEUTRAL_IN = 32;
 const int PIN_KICKSTAND_IN = 33;
 const int PIN_SPEED_OUT = 26;
+
+const int BUTTON_TOP = 2;   // top or left button depending on device orientation
+const int BUTTON_RIGHT = 0; // bottom or right button depending on device orientation
 
 const int SPEED_PULSES_PER_REV = 4;
 const int RPM_PULSES_PER_REV = 2;
@@ -102,7 +111,6 @@ bool rightButtonWasReleased = true;
 // Interactive Navigation Array Indices
 int odometerSelectRow = 0; 
 int speedOffsetSelectIdx = 0; 
-int maintSelectRow = 0; 
 
 // Extended Timeouts
 const unsigned long UNLOCK_HOLD_TIME = 2000;   
@@ -205,6 +213,13 @@ int currentSetupIndex = 1;
 int userRestoredSetupIdx = 1; 
 bool isDemoModeActive = false; 
 
+// --- Race Pairing & Lobby State ---
+enum RaceState { RACE_IDLE, RACE_HOSTING, RACE_PAIRED, RACE_ACTIVE };
+RaceState raceState = RACE_IDLE;
+String raceHostToken = "";
+String racePartnerIp = "";
+unsigned long raceStartTime = 0;
+
 // --- HTML Core Portal Source (Saved in Flash Memory) ---
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -219,7 +234,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #050507; color: #e2e2e7; margin: 0; padding: 10px; text-align: center; -webkit-user-select: none; overflow: hidden; }
-        .dashboard { max-width: 850px; margin: 0 auto; background: #0f0f14; padding: 15px; border-radius: 20px; box-shadow: 0 12px 36px rgba(0,0,0,0.9); border: 1px solid #1c1c24; display: flex; flex-direction: column; height: calc(100vh - 20px); box-sizing: border-box; transition: background-color 0.05s ease; }
+        .dashboard { max-width: 850px; margin: 0 auto; background: #0f0f14; padding: 15px; border-radius: 20px; box-shadow: 0 12px 36px rgba(0,0,0,0.9); border: 1px solid #1c1c24; display: flex; flex-direction: column; height: calc(100vh - 20px); box-sizing: border-box; transition: background-color 0.05s ease; position: relative; padding-bottom: 68px; }
         
         .shift-flash-active { background-color: #5a0000 !important; }
         
@@ -228,7 +243,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         
         .content-area { flex: 1; display: flex; justify-content: center; align-items: center; margin: 10px 0; overflow: hidden; position: relative; gap: 0; }
         
-        .gauge-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: #07070a; border-radius: 16px; border: 1px solid #14141c; box-sizing: border-box; padding: 5px; transition: transform 0.3s ease; }
+        .gauge-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: #07070a; border-radius: 16px; border: 1px solid #14141c; box-sizing: border-box; padding: 5px; transition: transform 0.3s ease; position: relative; }
         canvas { max-height: 100%; width: auto; aspect-ratio: 1/1; }
         
         .sub-page { display: none; width: 100%; height: 100%; text-align: left; box-sizing: border-box; padding: 10px 20px; overflow-y: auto; }
@@ -263,6 +278,21 @@ const char index_html[] PROGMEM = R"rawliteral(
         .select-row { display: flex; align-items: center; gap: 10px; }
         .select-row select { flex: 1; min-width: 0; background: #07070a; color: #fff; border: 1px solid #2c2c3c; border-radius: 8px; padding: 9px 10px; font-weight: 700; font-size: 13px; }
         .status-message { color: #34c759; font-size: 12px; font-weight: 800; min-height: 16px; margin-top: 10px; }
+        .gear-tracker { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; gap: 8px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; z-index: 4; }
+        .gear-dot { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; border: 2px solid #242430; color: #8e8e93; background: #101018; }
+        .gear-dot.active { box-shadow: 0 0 8px rgba(255,255,255,0.18); }
+        .gear-dot.active.neutral { background: #34c759; color: #071007; border-color: #34c759; }
+        .gear-dot.active.yellow { background: #ffd60a; color: #101010; border-color: #b08900; }
+        .gear-dot.active.red { background: #ff3b30; color: #071007; border-color: #bf1c24; }
+        .race-status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .race-card { background: #111118; border: 1px solid #242430; border-radius: 12px; padding: 15px; }
+        .race-card h3 { margin: 0 0 12px; font-size: 14px; color: #8e8e93; text-transform: uppercase; letter-spacing: 0.5px; }
+        .race-card .race-line { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; }
+        .race-card .race-line span:last-child { color: #fff; font-weight: 700; }
+        .race-input-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .race-input-row input { flex: 1; min-width: 180px; background: #07070a; border: 1px solid #242430; border-radius: 10px; color: #fff; padding: 10px; }
+        .race-input-row button { flex: 1; min-width: 120px; }
+        .race-hint { color: #8e8e93; font-size: 12px; margin-top: 8px; }
         .metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
         .metric-cell { background: #07070a; border: 1px solid #242430; border-radius: 8px; padding: 10px; }
         .metric-label { color: #8e8e93; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
@@ -285,10 +315,18 @@ const char index_html[] PROGMEM = R"rawliteral(
         input:checked + .slider { background-color: #34c759; }
         input:checked + .slider:before { transform: translateX(22px); }
         
-        .nav-bar { display: flex; overflow-x: auto; gap: 8px; padding-top: 10px; border-top: 1px solid #242430; scrollbar-width: none; min-height: 44px; }
+        .nav-bar { display: flex; position: absolute; bottom: 12px; left: 20px; right: 20px; gap: 8px; scrollbar-width: none; min-height: 44px; overflow-x: auto; -webkit-overflow-scrolling: touch; justify-content: flex-start; }
         .nav-bar::-webkit-scrollbar { display: none; }
-        .nav-btn { background: #1c1c24; color: #aeaeae; border: 1px solid #2c2c3c; padding: 0 20px; border-radius: 30px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; height: 38px; display: flex; align-items: center; justify-content: center; }
+        .nav-btn { background: #1c1c24; color: #aeaeae; border: 1px solid #2c2c3c; padding: 0 14px; border-radius: 30px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; height: 36px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 88px; }
         .nav-btn.active { background: #007aff; color: #fff; border-color: #007aff; box-shadow: 0 0 10px rgba(0,122,255,0.4); }
+        .large-gear { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.95); z-index: 9999; }
+        .large-gear-value { font-weight: 900; color: #ffffff; font-size: 140px; text-align: center; }
+        .large-gear.shift { background-color: #ff3b30; color: #071007; }
+        .large-gear-value.pulse { animation: pulse 800ms ease-in-out infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.08); } 100% { transform: scale(1); } }
+        .nav-center { left: 50% !important; transform: translateX(-50%) !important; justify-content: center !important; width: calc(100% - 40px) !important; }
+        .version-badge { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #8e8e93; text-transform: uppercase; align-self: center; }
+        .version-notes { color: #8e8e93; font-size: 12px; line-height: 1.4; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -296,11 +334,17 @@ const char index_html[] PROGMEM = R"rawliteral(
         <div class="status-bar">
             <div>SPEEDFOXX SF WEB PORTAL</div>
             <div id="sprocket-banner">SPROCKET: <span>-- / --</span></div>
+            <div id="version-badge">FW: 1.1.1</div>
         </div>
         
         <div class="content-area">
             <div id="page-dash" class="gauge-container">
                 <canvas id="lfaGauge" width="340" height="340"></canvas>
+                <div id="gear-tracker" class="gear-tracker"></div>
+                <div id="large-gear-overlay" class="large-gear" style="display:none;">
+                  <div id="large-gear-value" class="large-gear-value">N</div>
+                  <button class="interactive-btn" style="position:absolute;right:14px;top:12px;" onclick="toggleLargeGear(null)">Close</button>
+                </div>
             </div>
 
             <div id="page-control" class="sub-page">
@@ -385,6 +429,22 @@ const char index_html[] PROGMEM = R"rawliteral(
                         </div>
                     </div>
                 </div>
+                  <div class="control-section">
+                    <div style="font-size: 11px; font-weight:700; color:#8e8e93; text-transform:uppercase; margin-bottom:10px;">Portal Settings</div>
+                    <div class="control-row">
+                      <span class="control-label-text">Firmware Version</span>
+                      <span class="val-display" id="current-version">1.1.1</span>
+                    </div>
+                    <div id="version-notes" class="version-notes">Latest firmware notes will appear here.</div>
+                    <div class="control-row">
+                      <span class="control-label-text">Center Nav Bar on Large Displays</span>
+                      <label class="switch"><input type="checkbox" id="setting-nav-center" onchange="toggleNavCenter(this)"><span class="slider"></span></label>
+                    </div>
+                    <div class="control-row">
+                      <span class="control-label-text">Run Gear Simulation</span>
+                      <button class="interactive-btn" onclick="runGearSimulation()">Run Simulation</button>
+                    </div>
+                  </div>
             </div>
 
             <div id="page-sprockets" class="sub-page">
@@ -505,6 +565,44 @@ const char index_html[] PROGMEM = R"rawliteral(
                 </table>
             </div>
 
+            <div id="page-race" class="sub-page">
+                <div class="control-panel-wrapper">
+                    <h2>Race Lobby</h2>
+
+                    <div class="control-section race-card">
+                        <h3>Local Device</h3>
+                        <div class="race-line"><span>Device IP</span><span id="race-device-ip">--</span></div>
+                        <div class="race-line"><span>Local Role</span><span id="race-local-role">Solo</span></div>
+                        <div class="race-line"><span>Current State</span><span id="race-status">Idle</span></div>
+                        <div class="race-line"><span>Host Token</span><span id="race-origin-token">—</span></div>
+                        <div class="race-line"><span>Partner</span><span id="race-partner-ip">None</span></div>
+                    </div>
+
+                    <div class="control-section race-card">
+                        <h3>Host Controls</h3>
+                        <div class="race-input-row">
+                            <button class="interactive-btn" onclick="createRaceSession()">Create Race Host</button>
+                            <button class="interactive-btn" onclick="startRaceSession()">Start Race</button>
+                            <button class="interactive-btn danger-btn" onclick="cancelRaceSession()">Cancel Race</button>
+                        </div>
+                        <div class="race-hint">Use these controls when you want this SpeedFoxx to act as the host device.</div>
+                    </div>
+
+                    <div class="control-section race-card">
+                        <h3>Join a Race</h3>
+                        <div class="race-input-row">
+                            <input type="text" id="race-host-ip" placeholder="Host IP address">
+                            <input type="text" id="race-token-input" placeholder="Host race token">
+                        </div>
+                        <div class="race-input-row">
+                            <button class="interactive-btn" onclick="joinRaceHost()">Join Host</button>
+                            <button class="interactive-btn" onclick="queryHostRaceStatus()">Check Host</button>
+                        </div>
+                        <div class="race-hint">Enter the host gateway address and token from the host device portal.</div>
+                    </div>
+                </div>
+            </div>
+
             <div id="page-service" class="sub-page">
                 <h2>Maintenance Logs</h2>
                 <table class="data-table">
@@ -535,9 +633,11 @@ const char index_html[] PROGMEM = R"rawliteral(
 
         <div class="nav-bar">
             <button class="nav-btn active" onclick="switchPage('dash', this)">Live Dash</button>
+          <button class="nav-btn" onclick="toggleLargeGear(this)">Large Gear</button>
             <button class="nav-btn" onclick="switchPage('clusters', this)">Clusters</button>
             <button class="nav-btn" onclick="switchPage('sprockets', this)">Sprockets</button>
             <button class="nav-btn" onclick="switchPage('control', this)">Command Panel</button>
+            <button class="nav-btn" onclick="switchPage('race', this)">Race Lobby</button>
             <button class="nav-btn" onclick="switchPage('perf', this)">Drag Times</button>
             <button class="nav-btn" onclick="switchPage('records', this)">Records</button>
             <button class="nav-btn" onclick="switchPage('service', this)">Maintenance</button>
@@ -553,6 +653,9 @@ const char index_html[] PROGMEM = R"rawliteral(
         let currentLayout = 'cbr600rr-detail';
         let liveSprocketIndex = '1';
         let sprocketSelectionDirty = false;
+        let localRaceRole = 'Solo';
+        let localRaceStatus = 'Idle';
+        let localRacePartner = 'None';
 
         function switchPage(pageId, btnEl) {
             document.getElementById('page-dash').style.display = 'none';
@@ -561,6 +664,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             document.getElementById('page-control').style.display = 'none';
             document.getElementById('page-perf').style.display = 'none';
             document.getElementById('page-records').style.display = 'none';
+            document.getElementById('page-race').style.display = 'none';
             document.getElementById('page-service').style.display = 'none';
             
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -729,6 +833,171 @@ const char index_html[] PROGMEM = R"rawliteral(
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(label, x, y);
+        }
+
+        function updateGearTracker() {
+          // Motorcycle physical order: 1 N 2 3 4 5 6
+          const labels = ['1','N','2','3','4','5','6'];
+          const container = document.getElementById('gear-tracker');
+          container.innerHTML = labels.map(label => {
+            const active = liveData.gear === label;
+            const stateClass = label === 'N' ? ' neutral' : (label === '6' ? ' red' : ' yellow');
+            return `<div class="gear-dot${stateClass}${active ? ' active' : ''}">${label}</div>`;
+          }).join('');
+        }
+
+        function toggleLargeGear(btnEl) {
+          const overlay = document.getElementById('large-gear-overlay');
+          const isOpen = overlay.style.display === 'flex';
+          if (isOpen) {
+            overlay.style.display = 'none';
+            if (btnEl) btnEl.classList.remove('active');
+          } else {
+            overlay.style.display = 'flex';
+            if (btnEl) btnEl.classList.add('active');
+            updateLargeGearDisplay();
+          }
+        }
+
+        function updateLargeGearDisplay() {
+          const overlay = document.getElementById('large-gear-overlay');
+          if (!overlay || overlay.style.display === 'none') return;
+          const val = document.getElementById('large-gear-value');
+          val.innerText = liveData.gear;
+          // reflect shift state with a class to allow CSS change
+          if (liveData.activeSim && liveData.rpm >= liveData.shift) {
+            val.classList.add('shift');
+          } else {
+            val.classList.remove('shift');
+          }
+        }
+
+        function toggleNavCenter(checkbox) {
+          const nav = document.querySelector('.nav-bar');
+          nav.classList.toggle('nav-center', checkbox.checked);
+          localStorage.setItem('sfNavCenter', checkbox.checked ? '1' : '0');
+        }
+
+        function loadPortalSettings() {
+          const center = localStorage.getItem('sfNavCenter') === '1';
+          document.getElementById('setting-nav-center').checked = center;
+          document.querySelector('.nav-bar').classList.toggle('nav-center', center);
+        }
+
+        // simple client-side gear simulation to validate single-active-light behavior
+        function runGearSimulation() {
+          const labels = ['1','N','2','3','4','5','6'];
+          let i = 0;
+          document.getElementById('simToggle').checked = true;
+          const tick = setInterval(() => {
+            liveData.gear = labels[i % labels.length];
+            // set rpm higher for shift gear to exercise flash
+            liveData.rpm = (liveData.gear === 'N') ? 500 : 12000 + (i * 500);
+            updateGearTracker();
+            // verify only one active dot
+            const active = document.querySelectorAll('.gear-dot.active');
+            if (active.length !== 1) console.warn('Simulation: Unexpected active count', active.length);
+            i++;
+            if (i > labels.length * 3) {
+              clearInterval(tick);
+              document.getElementById('simToggle').checked = false;
+            }
+          }, 550);
+        }
+
+        function createRaceSession() {
+            fetch('/raceCreate')
+                .then(res => res.json())
+                .then(d => {
+                    document.getElementById('race-origin-token').innerText = d.token || '—';
+                    document.getElementById('race-status').innerText = 'Hosting';
+                    document.getElementById('race-local-role').innerText = 'Host';
+                    localRaceRole = 'Host';
+                    localRaceStatus = 'Hosting';
+                    localRacePartner = 'None';
+                })
+                .catch(() => alert('Unable to create race host.'));
+        }
+
+        function joinRaceHost() {
+            const hostIp = document.getElementById('race-host-ip').value.trim();
+            const token = document.getElementById('race-token-input').value.trim();
+            if (!hostIp || !token) {
+                alert('Enter both host IP and token.');
+                return;
+            }
+            fetch(`http://${hostIp}/raceJoin?token=${encodeURIComponent(token)}`)
+                .then(res => {
+                    if (!res.ok) throw new Error('Join failed');
+                    document.getElementById('race-status').innerText = 'Joined Host';
+                    document.getElementById('race-local-role').innerText = 'Guest';
+                    document.getElementById('race-partner-ip').innerText = hostIp;
+                    localRaceRole = 'Guest';
+                    localRaceStatus = 'Joined Host';
+                    localRacePartner = hostIp;
+                })
+                .catch(() => alert('Unable to join host. Check IP / token / network.'));
+        }
+
+        function startRaceSession() {
+            fetch('/raceStart?token=' + encodeURIComponent(document.getElementById('race-origin-token').innerText))
+                .then(res => {
+                    if (!res.ok) throw new Error('Start failed');
+                    document.getElementById('race-status').innerText = 'Race Active';
+                    localRaceStatus = 'Active';
+                })
+                .catch(() => alert('Unable to start race. Confirm host session first.'));
+        }
+
+        function cancelRaceSession() {
+            fetch('/raceCancel?token=' + encodeURIComponent(document.getElementById('race-origin-token').innerText))
+                .then(res => {
+                    if (!res.ok) throw new Error('Cancel failed');
+                    document.getElementById('race-status').innerText = 'Idle';
+                    document.getElementById('race-local-role').innerText = 'Solo';
+                    document.getElementById('race-partner-ip').innerText = 'None';
+                    document.getElementById('race-origin-token').innerText = '—';
+                    localRaceRole = 'Solo';
+                    localRaceStatus = 'Idle';
+                    localRacePartner = 'None';
+                })
+                .catch(() => alert('Unable to cancel race.'));
+        }
+
+        function queryHostRaceStatus() {
+            const hostIp = document.getElementById('race-host-ip').value.trim();
+            if (!hostIp) {
+                alert('Enter host IP to check status.');
+                return;
+            }
+            fetch(`http://${hostIp}/raceStatus`)
+                .then(res => res.json())
+                .then(d => {
+                    document.getElementById('race-origin-token').innerText = d.token || '—';
+                    document.getElementById('race-partner-ip').innerText = d.partner || 'None';
+                    document.getElementById('race-status').innerText = d.status || 'Unknown';
+                    document.getElementById('race-local-role').innerText = 'Guest';
+                    localRaceRole = 'Guest';
+                    localRaceStatus = d.status || 'Unknown';
+                    localRacePartner = d.partner || 'None';
+                })
+                .catch(() => alert('Unable to query host.'));
+        }
+
+        function updateRacePage(d) {
+            document.getElementById('race-device-ip').innerText = d.hostIp || '--';
+            if (d.raceToken) {
+                document.getElementById('race-origin-token').innerText = d.raceToken;
+            }
+            if (localRaceRole === 'Guest') {
+                document.getElementById('race-status').innerText = localRaceStatus;
+                document.getElementById('race-local-role').innerText = localRaceRole;
+                document.getElementById('race-partner-ip').innerText = localRacePartner;
+            } else {
+                document.getElementById('race-status').innerText = d.raceStatus || 'Idle';
+                document.getElementById('race-local-role').innerText = (d.raceStatus === 'hosting' || d.raceStatus === 'paired' || d.raceStatus === 'active') ? 'Host' : 'Solo';
+                document.getElementById('race-partner-ip').innerText = d.racePartnerIp || 'None';
+            }
         }
 
         // --- DETAILED DASH: 2005 CBR600RR inspired ---
@@ -1189,10 +1458,19 @@ const char index_html[] PROGMEM = R"rawliteral(
                     document.getElementById('s-oil-hours').innerText = d.oilH.toFixed(4) + ' hrs';
                     document.getElementById('s-tripa').innerText = d.trA.toFixed(2) + ' mi';
                     document.getElementById('s-tripb').innerText = d.trB.toFixed(2) + ' mi';
+                    document.getElementById('version-badge').innerText = 'FW ' + d.version;
+                    document.getElementById('current-version').innerText = d.version;
+                    if (d.versionHistory && Array.isArray(d.versionHistory) && d.versionHistory.length > 0) {
+                        document.getElementById('version-notes').innerText = d.versionHistory[0].notes || '';
+                    }
+                    updateGearTracker();
+                    updateLargeGearDisplay();
+                    updateRacePage(d);
                 })
                 .catch(err => console.log('Thread link drop'));
         }, 150);
 
+        loadPortalSettings();
         window.requestAnimationFrame(loopRender);
     </script>
 </body>
@@ -1496,7 +1774,58 @@ void runAdvancedCBRSimulation() {
 }
 
 void handleRoot() {
-  server.send(200, "text/html", index_html);
+  server.send_P(200, PSTR("text/html"), index_html);
+}
+
+const char* raceStateToString(RaceState state) {
+  switch (state) {
+    case RACE_HOSTING: return "hosting";
+    case RACE_PAIRED:  return "paired";
+    case RACE_ACTIVE:  return "active";
+    default:           return "idle";
+  }
+}
+
+const char* telemetrySourceToString(TelemetrySource source) {
+  return source == SOURCE_BIKE_INPUTS ? "bike" : "sim";
+}
+
+inline const char* jsonBool(bool value) {
+  return value ? "true" : "false";
+}
+
+void appendJsonField(String &json, const char *key, const String &value, bool quote = true) {
+  json += "\"";
+  json += key;
+  json += "\":";
+  if (quote) {
+    json += "\"";
+    json += value;
+    json += "\"";
+  } else {
+    json += value;
+  }
+  json += ",";
+}
+
+void appendJsonField(String &json, const char *key, int value) {
+  appendJsonField(json, key, String(value), false);
+}
+
+void appendJsonField(String &json, const char *key, float value, int precision = 2) {
+  json += "\"";
+  json += key;
+  json += "\":";
+  json += String(value, precision);
+  json += ",";
+}
+
+void appendJsonField(String &json, const char *key, bool value) {
+  json += "\"";
+  json += key;
+  json += "\":";
+  json += jsonBool(value);
+  json += ",";
 }
 
 void handleData() {
@@ -1505,54 +1834,61 @@ void handleData() {
   float correctionFactor = stockFinalDrive / currentFinalDrive;
 
   String json = "{";
-  json += "\"mph\":" + String(currentMPH) + ",";
-  json += "\"rpm\":" + String(currentRPM) + ",";
-  json += "\"gear\":\"" + currentGear + "\",";
-  json += "\"odo\":" + String(totalOdometer, 1) + ",";
-  json += "\"shift\":" + String(userShiftPoint) + ",";
-  json += "\"flash\":" + String(lightFlashDelay) + ",";
-  json += "\"stage\":\"" + optoRPMStatus + "\","; 
-  json += "\"speedStage\":\"" + optoSPDStatus + "\",";
-  json += "\"neutralStage\":\"" + optoNeutralStatus + "\",";
-  json += "\"kickstandStage\":\"" + optoKickstandStatus + "\",";
-  json += "\"temp\":" + String(coolantTempF) + ","; 
-  json += "\"activeSim\":" + String(isSimulationActive ? "true" : "false") + ",";
-  json += "\"source\":\"" + String(telemetrySource == SOURCE_SIMULATOR ? "sim" : "bike") + "\",";
-  json += "\"pinSpeedIn\":" + String(PIN_SPEED_IN) + ",";
-  json += "\"pinRpmIn\":" + String(PIN_RPM_IN) + ",";
-  json += "\"pinNeutralIn\":" + String(PIN_NEUTRAL_IN) + ",";
-  json += "\"pinKickstandIn\":" + String(PIN_KICKSTAND_IN) + ",";
-  json += "\"pinSpeedOut\":" + String(PIN_SPEED_OUT) + ",";
-  json += "\"speedPpr\":" + String(SPEED_PULSES_PER_REV) + ",";
-  json += "\"rpmPpr\":" + String(RPM_PULSES_PER_REV) + ",";
-  json += "\"inputActiveLow\":" + String(INPUT_ACTIVE_LOW ? "true" : "false") + ",";
-  json += "\"outputActiveLow\":" + String(OUTPUT_ACTIVE_LOW ? "true" : "false") + ",";
-  json += "\"isDemo\":" + String(isDemoModeActive ? "true" : "false") + ",";
-  json += "\"frontT\":" + String(simulationSetups[currentSetupIndex].frontTeeth) + ",";
-  json += "\"rearT\":" + String(simulationSetups[currentSetupIndex].rearTeeth) + ",";
-  json += "\"setupIndex\":" + String(currentSetupIndex) + ",";
-  json += "\"stockFront\":" + String(STOCK_FRONT_TEETH) + ",";
-  json += "\"stockRear\":" + String(STOCK_REAR_TEETH) + ",";
-  json += "\"currentFront\":" + String(currentFrontTeeth) + ",";
-  json += "\"currentRear\":" + String(currentRearTeeth) + ",";
-  json += "\"stockFinal\":" + String(stockFinalDrive, 4) + ",";
-  json += "\"currentFinal\":" + String(currentFinalDrive, 4) + ",";
-  json += "\"correctionFactor\":" + String(correctionFactor, 4) + ",";
-  json += "\"maxM\":" + String(maxRecordedSpeed) + ",";
-  json += "\"maxR\":" + String(maxRecordedRPM) + ",";
-  json += "\"b60\":" + String(best0To60, 2) + ",";
-  json += "\"bQ\":" + String(bestQuarterMile, 2) + ",";
-  json += "\"t60\":" + String(time0To60, 2) + ",";
-  json += "\"t100\":" + String(time0To100, 2) + ",";
-  json += "\"tQ\":" + String(timeQuarterMile, 2) + ",";
-  json += "\"tS\":" + String(speedQuarterMile) + ",";
-  json += "\"hrs\":" + String(engineHours, 4) + ",";
-  json += "\"oil\":" + String(oilLifePercent) + ",";
-  json += "\"oilM\":" + String(milesOnCurrentOil, 2) + ",";
-  json += "\"oilH\":" + String(hoursOnCurrentOil, 4) + ",";
-  json += "\"trA\":" + String(tripA, 2) + ",";
-  json += "\"trB\":" + String(tripB, 2); 
-  json += "}";
+  appendJsonField(json, "mph", currentMPH);
+  appendJsonField(json, "rpm", currentRPM);
+  appendJsonField(json, "gear", currentGear);
+  appendJsonField(json, "odo", totalOdometer, 1);
+  appendJsonField(json, "shift", userShiftPoint);
+  appendJsonField(json, "flash", lightFlashDelay);
+  appendJsonField(json, "stage", optoRPMStatus);
+  appendJsonField(json, "speedStage", optoSPDStatus);
+  appendJsonField(json, "neutralStage", optoNeutralStatus);
+  appendJsonField(json, "kickstandStage", optoKickstandStatus);
+  appendJsonField(json, "temp", coolantTempF);
+  appendJsonField(json, "activeSim", isSimulationActive);
+  appendJsonField(json, "source", telemetrySourceToString(telemetrySource));
+  appendJsonField(json, "pinSpeedIn", PIN_SPEED_IN);
+  appendJsonField(json, "pinRpmIn", PIN_RPM_IN);
+  appendJsonField(json, "pinNeutralIn", PIN_NEUTRAL_IN);
+  appendJsonField(json, "pinKickstandIn", PIN_KICKSTAND_IN);
+  appendJsonField(json, "pinSpeedOut", PIN_SPEED_OUT);
+  appendJsonField(json, "speedPpr", SPEED_PULSES_PER_REV);
+  appendJsonField(json, "rpmPpr", RPM_PULSES_PER_REV);
+  appendJsonField(json, "inputActiveLow", INPUT_ACTIVE_LOW);
+  appendJsonField(json, "outputActiveLow", OUTPUT_ACTIVE_LOW);
+  appendJsonField(json, "isDemo", isDemoModeActive);
+  appendJsonField(json, "version", FIRMWARE_VERSION);
+  appendJsonField(json, "versionHistory", String(FIRMWARE_CHANGELOG), false);
+  appendJsonField(json, "hostIp", WiFi.softAPIP().toString());
+  appendJsonField(json, "raceStatus", raceStateToString(raceState));
+  appendJsonField(json, "raceToken", raceHostToken);
+  appendJsonField(json, "racePartnerIp", racePartnerIp);
+  appendJsonField(json, "frontT", simulationSetups[currentSetupIndex].frontTeeth);
+  appendJsonField(json, "rearT", simulationSetups[currentSetupIndex].rearTeeth);
+  appendJsonField(json, "setupIndex", currentSetupIndex);
+  appendJsonField(json, "stockFront", STOCK_FRONT_TEETH);
+  appendJsonField(json, "stockRear", STOCK_REAR_TEETH);
+  appendJsonField(json, "currentFront", currentFrontTeeth);
+  appendJsonField(json, "currentRear", currentRearTeeth);
+  appendJsonField(json, "stockFinal", stockFinalDrive, 4);
+  appendJsonField(json, "currentFinal", currentFinalDrive, 4);
+  appendJsonField(json, "correctionFactor", correctionFactor, 4);
+  appendJsonField(json, "maxM", maxRecordedSpeed);
+  appendJsonField(json, "maxR", maxRecordedRPM);
+  appendJsonField(json, "b60", best0To60, 2);
+  appendJsonField(json, "bQ", bestQuarterMile, 2);
+  appendJsonField(json, "t60", time0To60, 2);
+  appendJsonField(json, "t100", time0To100, 2);
+  appendJsonField(json, "tQ", timeQuarterMile, 2);
+  appendJsonField(json, "tS", speedQuarterMile);
+  appendJsonField(json, "hrs", engineHours, 4);
+  appendJsonField(json, "oil", oilLifePercent);
+  appendJsonField(json, "oilM", milesOnCurrentOil, 2);
+  appendJsonField(json, "oilH", hoursOnCurrentOil, 4);
+  appendJsonField(json, "trA", tripA, 2);
+  appendJsonField(json, "trB", tripB, 2);
+  json.setCharAt(json.length() - 1, '}');
+
   server.send(200, "application/json", json);
 }
 
@@ -1650,6 +1986,122 @@ void handleResetTrip() {
   }
 }
 
+void sendRaceResponse(const String &payload) {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200, "application/json", payload);
+}
+
+void handleRaceCreate() {
+  raceHostToken = String(random(1000, 9999));
+  racePartnerIp = "";
+  raceState = RACE_HOSTING;
+  raceStartTime = 0;
+
+  String json = "{";
+  json += "\"token\":\"" + raceHostToken + "\",";
+  json += "\"status\":\"hosting\",";
+  json += "\"hostIp\":\"" + WiFi.softAPIP().toString() + "\"";
+  json += "}";
+  sendRaceResponse(json);
+}
+
+void handleRaceJoin() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  if (!server.hasArg("token")) {
+    server.send(400, "text/plain", "Missing token");
+    return;
+  }
+  String token = server.arg("token");
+  if (raceState != RACE_HOSTING || token != raceHostToken) {
+    server.send(400, "text/plain", "Invalid token or not accepting joins");
+    return;
+  }
+
+  racePartnerIp = server.client().remoteIP().toString();
+  raceState = RACE_PAIRED;
+
+  String json = "{";
+  json += "\"status\":\"paired\",";
+  json += "\"partner\":\"" + racePartnerIp + "\"";
+  json += "}";
+  sendRaceResponse(json);
+}
+
+void handleRaceStart() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  if (!server.hasArg("token") || server.arg("token") != raceHostToken) {
+    server.send(400, "text/plain", "Invalid host token");
+    return;
+  }
+  if (raceState != RACE_PAIRED) {
+    server.send(400, "text/plain", "No paired race to start");
+    return;
+  }
+  raceState = RACE_ACTIVE;
+  raceStartTime = millis();
+  // attempt to notify partner device to begin at the same time
+  if (racePartnerIp.length() > 0) {
+    WiFiClient client;
+    String url = String("/raceNotify?token=") + raceHostToken;
+    if (client.connect(racePartnerIp.c_str(), 80)) {
+      client.print(String("GET ") + url + " HTTP/1.1\r\nHost: " + racePartnerIp + "\r\nConnection: close\r\n\r\n");
+      // read and discard response briefly
+      unsigned long start = millis();
+      while (client.connected() && (millis() - start) < 400) {
+        while (client.available()) client.read();
+      }
+      client.stop();
+    }
+  }
+  String json = "{";
+  json += "\"status\":\"active\"";
+  json += "}";
+  sendRaceResponse(json);
+}
+
+void handleRaceNotify() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  if (!server.hasArg("token") || server.arg("token") != raceHostToken) {
+    server.send(400, "text/plain", "Invalid token");
+    return;
+  }
+  // partner received notification to begin
+  raceState = RACE_ACTIVE;
+  raceStartTime = millis();
+  String json = "{";
+  json += "\"status\":\"notified\"";
+  json += "}";
+  sendRaceResponse(json);
+}
+
+void handleRaceCancel() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  if (server.hasArg("token") && server.arg("token") != raceHostToken) {
+    server.send(400, "text/plain", "Invalid token");
+    return;
+  }
+  raceState = RACE_IDLE;
+  raceHostToken = "";
+  racePartnerIp = "";
+  raceStartTime = 0;
+  String json = "{";
+  json += "\"status\":\"idle\"";
+  json += "}";
+  sendRaceResponse(json);
+}
+
+void handleRaceStatus() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  String state = raceStateToString(raceState);
+  String json = "{";
+  json += "\"status\":\"" + state + "\",";
+  json += "\"token\":\"" + raceHostToken + "\",";
+  json += "\"partner\":\"" + racePartnerIp + "\",";
+  json += "\"hostIp\":\"" + WiFi.softAPIP().toString() + "\"";
+  json += "}";
+  sendRaceResponse(json);
+}
+
 void drawHoldProgressBar(int yPos) {
   unsigned long holdProgress = millis() - buttonHoldStartTime;
   int barW = map(holdProgress, 0, UNLOCK_HOLD_TIME, 0, 124);
@@ -1658,35 +2110,10 @@ void drawHoldProgressBar(int yPos) {
   display.fillRect(1, yPos + 1, barW, 5, SSD1306_WHITE);
 }
 
-void drawDisplayCalibrationGrid() {
-  display.drawRect(0, 0, 128, 64, SSD1306_WHITE);
-  display.drawRect(2, 2, 124, 60, SSD1306_WHITE);
-  display.drawFastHLine(0, 16, 128, SSD1306_WHITE);
-  display.drawFastVLine(64, 0, 64, SSD1306_WHITE);
-
-  for (int x = 16; x < 128; x += 16) {
-    display.drawFastVLine(x, 0, 4, SSD1306_WHITE);
-    display.drawFastVLine(x, 60, 4, SSD1306_WHITE);
-  }
-  for (int y = 8; y < 64; y += 8) {
-    display.drawFastHLine(0, y, 4, SSD1306_WHITE);
-    display.drawFastHLine(124, y, 4, SSD1306_WHITE);
-  }
-
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(5, 5); display.print("YEL");
-  display.setCursor(67, 5); display.print("128x64");
-  display.setCursor(5, 20); display.print("BLUE SAFE AREA");
-  display.setCursor(5, 34); display.print("012345678901234567890");
-  display.setCursor(5, 48); display.print("0,63");
-  display.setCursor(91, 48); display.print("127,63");
-}
-
 void updateDisplay() {
   display.clearDisplay();
   
-  if ((currentPage == 0 || currentPage == 8) && isSimulationActive && currentRPM >= userShiftPoint) {
+  if ((currentPage == 0 || currentPage == 1 || currentPage == 8) && isSimulationActive && currentRPM >= userShiftPoint) {
     flashInverted = !flashInverted;
     display.invertDisplay(flashInverted);
   } else {
@@ -1696,18 +2123,18 @@ void updateDisplay() {
   display.setTextSize(1); display.setTextColor(SSD1306_WHITE); display.setCursor(0, 0);
   
   if (currentPage == 0)      { display.println("CBR600RR COMPUTER"); }
-  else if (currentPage == 1) { display.println("GEARING RATIO MATRIX"); }
-  else if (currentPage == 2) { display.print("SPROCKET CONFIG "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); } 
-  else if (currentPage == 3) { display.println("PERFORMANCE TIMER"); }
-  else if (currentPage == 4) { display.print("SHIFT POINT "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
-  else if (currentPage == 5) { display.print("MAINTENANCE LOG "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
-  else if (currentPage == 6) { display.println("WI-FI NETWORK PORTAL"); } 
-  else if (currentPage == 7) { display.println("PERSONAL BESTS"); } 
-  else if (currentPage == 8) { display.println("SIMULATION DEMO"); }
-  else if (currentPage == 9) { display.print("SIMULATION CORE "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
-  else if (currentPage == 10){ display.print("ODOMETER "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
-  else if (currentPage == 11){ display.print("SHIFT LIGHTS "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
-  else if (currentPage == 12){ display.println("DISPLAY CAL GRID"); }
+  else if (currentPage == 1) { display.println("GEAR ONLY"); }
+  else if (currentPage == 2) { display.println("GEARING RATIO MATRIX"); }
+  else if (currentPage == 3) { display.print("SPROCKET CONFIG "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); } 
+  else if (currentPage == 4) { display.println("PERFORMANCE TIMER"); }
+  else if (currentPage == 5) { display.print("SHIFT POINT "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
+  else if (currentPage == 6) { display.print("MAINTENANCE LOG "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
+  else if (currentPage == 7) { display.println("WI-FI NETWORK PORTAL"); } 
+  else if (currentPage == 8) { display.println("PERSONAL BESTS"); } 
+  else if (currentPage == 9) { display.println("SIMULATION DEMO"); }
+  else if (currentPage == 10){ display.print("SIMULATION CORE "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
+  else if (currentPage == 11){ display.print("ODOMETER "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
+  else if (currentPage == 12){ display.print("SHIFT LIGHTS "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
   
   display.drawFastHLine(0, 10, 128, SSD1306_WHITE); 
 
@@ -1727,7 +2154,30 @@ void updateDisplay() {
       if (!isMenuUnlocked) display.print("SYS LCK");
     }
   } 
-  else if (currentPage == 1) { 
+  else if (currentPage == 1) {
+    // Gear-only full-screen display (large gear, optional flash on shift)
+    unsigned long t = millis();
+    bool shiftActive = (currentRPM >= userShiftPoint);
+    bool flashOn = ((t / 250) % 2) == 0;
+    if (shiftActive && flashOn) {
+      display.fillRect(0, 0, 128, 64, SSD1306_WHITE);
+      display.setTextColor(SSD1306_BLACK);
+      display.setTextSize(4);
+      display.setCursor(36, 10);
+      display.print(currentGear);
+      display.setTextSize(1);
+      display.setTextColor(SSD1306_WHITE);
+    } else {
+      display.fillRect(0, 0, 128, 64, SSD1306_BLACK);
+      display.setTextColor(SSD1306_WHITE);
+      display.setTextSize(4);
+      display.setCursor(36, 10);
+      display.print(currentGear);
+      display.setTextSize(1);
+    }
+  } 
+  else if (currentPage == 2) { 
+    // GEARING RATIO MATRIX (moved to page 2)
     display.setCursor(0, 20);
     display.println("S1: 15/43 Ratio: 2.86");
     display.println("S2: 15/45 Ratio: 3.00");
@@ -1740,7 +2190,7 @@ void updateDisplay() {
        display.print("ACTIVE PROFILE S"); display.print(currentSetupIndex + 1);
     }
   } 
-  else if (currentPage == 2) { 
+  else if (currentPage == 3) { 
     if (isHoldingUnlockButton && !isEditModeActive) {
       display.setCursor(0, 22); display.println("Entering Setup...");
       drawHoldProgressBar(42);
@@ -1764,7 +2214,7 @@ void updateDisplay() {
       }
     }
   }
-  else if (currentPage == 3) {
+  else if (currentPage == 4) {
     display.setCursor(0, 16);
     if (currentTimerState == READY_TO_LAUNCH) {
       display.println("Status: BEST RECORDS");
@@ -1790,7 +2240,7 @@ void updateDisplay() {
       display.print("Trap Speed: "); display.print(speedQuarterMile); display.println(" MPH");
     }
   }
-  else if (currentPage == 4) {
+  else if (currentPage == 5) {
     if (isHoldingUnlockButton && !isEditModeActive) {
       display.setCursor(0, 22); display.println("Opening Config...");
       drawHoldProgressBar(42);
@@ -1803,7 +2253,7 @@ void updateDisplay() {
       else display.println("[Top] +100 | [Right] Exit");
     }
   }
-  else if (currentPage == 5) {
+  else if (currentPage == 6) {
     if (isHoldingUnlockButton && !isEditModeActive) {
       display.setCursor(0, 22); display.println("Accessing Engine...");
       drawHoldProgressBar(42);
@@ -1830,13 +2280,13 @@ void updateDisplay() {
       display.print("Hold Top to Configure");
     }
   }
-  else if (currentPage == 6) {
+  else if (currentPage == 7) {
     display.setCursor(0, 18); 
     display.print("SSID:"); display.println(ssid); 
     display.print("IP:   192.168.4.1");
     display.print("Port: 80 (Active)");
   }
-  else if (currentPage == 7) {
+  else if (currentPage == 8) {
     display.setCursor(0, 16);
     display.print("Max Speed:  "); display.print(maxRecordedSpeed); display.println(" MPH");
     display.print("Max RPM:    "); display.print(maxRecordedRPM); display.println(" RPM");
@@ -1844,7 +2294,7 @@ void updateDisplay() {
     display.print("Best 0-100: "); display.print(best0To100, 2); display.println(" s");
     display.print("Best 1/4M:  "); display.print(bestQuarterMile, 2); display.println(" s");
   }
-  else if (currentPage == 8) {
+  else if (currentPage == 9) {
     display.setCursor(0, 16);
     display.print("Profile: "); 
     if (isDemoModeActive) display.print("[D] ");
@@ -1863,7 +2313,7 @@ void updateDisplay() {
     display.print("RPM: "); display.print(currentRPM); display.print(" G: "); display.println(currentGear);
     display.print("Speed: "); display.print(currentMPH); display.println(" MPH");
   }
-  else if (currentPage == 9) {
+  else if (currentPage == 10) {
     if (isHoldingUnlockButton && !isEditModeActive) {
       display.setCursor(0, 22); display.println("Opening Core Logic...");
       drawHoldProgressBar(42);
@@ -1876,7 +2326,7 @@ void updateDisplay() {
       else display.println("[Top] Toggle | [Right] Exit");
     }
   }
-  else if (currentPage == 10) { 
+  else if (currentPage == 11) { 
     if (isHoldingUnlockButton && !isEditModeActive) {
       display.setCursor(0, 22); display.println("Opening Registers...");
       drawHoldProgressBar(42);
@@ -1891,7 +2341,7 @@ void updateDisplay() {
       else display.println("[Top] Reset | [Right] Swap");
     }
   }
-  else if (currentPage == 11) { 
+  else if (currentPage == 12) { 
     if (isHoldingUnlockButton && !isEditModeActive) {
       display.setCursor(0, 22); display.println("Opening Timers...");
       drawHoldProgressBar(42);
@@ -1903,9 +2353,6 @@ void updateDisplay() {
       if(!isEditModeActive) display.println("Hold Top to Edit");
       else display.println("[Top] -5ms | [Right] Exit");
     }
-  }
-  else if (currentPage == 12) {
-    drawDisplayCalibrationGrid();
   }
   display.display();
 }
@@ -1940,6 +2387,12 @@ void setup() {
   server.on("/adjustConfig", handleAdjustConfig);
   server.on("/resetOil", handleResetOil);
   server.on("/resetTrip", handleResetTrip);
+  server.on("/raceCreate", handleRaceCreate);
+  server.on("/raceJoin", handleRaceJoin);
+  server.on("/raceStart", handleRaceStart);
+  server.on("/raceNotify", handleRaceNotify);
+  server.on("/raceCancel", handleRaceCancel);
+  server.on("/raceStatus", handleRaceStatus);
   server.begin();
   
   simStateTimer = millis();
@@ -1987,7 +2440,7 @@ void loop() {
         isHoldingUnlockButton = true;
         buttonHoldStartTime = millis();
       } else if (millis() - buttonHoldStartTime >= UNLOCK_HOLD_TIME) {
-        isMenuUnlocked = true; isHoldingUnlockButton = false; currentPage = 1; 
+        isMenuUnlocked = true; isHoldingUnlockButton = false; currentPage = 2; 
         topButtonWasReleased = false; rightButtonWasReleased = false;
         lastActivityTime = millis(); delay(300);
       }
@@ -1998,8 +2451,8 @@ void loop() {
   }
 
   if (isMenuUnlocked && (millis() - lastButtonCheck > 50)) {
-    if (!isEditModeActive && topBtnPressed && topButtonWasReleased && 
-       (currentPage == 2 || currentPage == 4 || currentPage == 5 || currentPage == 9 || currentPage == 10 || currentPage == 11)) {
+     if (!isEditModeActive && topBtnPressed && topButtonWasReleased && 
+       (currentPage == 3 || currentPage == 5 || currentPage == 6 || currentPage == 10 || currentPage == 11 || currentPage == 12)) {
       
       if (!isHoldingUnlockButton) {
         isHoldingUnlockButton = true;
@@ -2010,8 +2463,8 @@ void loop() {
         topButtonWasReleased = false; 
         lastActivityTime = millis();
         
-        if (currentPage == 2) speedOffsetSelectIdx = isDemoModeActive ? 4 : currentSetupIndex;
-        if (currentPage == 10) odometerSelectRow = 0;
+        if (currentPage == 3) speedOffsetSelectIdx = isDemoModeActive ? 4 : currentSetupIndex;
+        if (currentPage == 11) odometerSelectRow = 0;
         delay(300);
       }
       return; 
@@ -2047,23 +2500,23 @@ void loop() {
       lastActivityTime = millis(); topButtonWasReleased = false; 
       
       if (isEditModeActive) {
-        if (currentPage == 2) { 
+        if (currentPage == 3) { 
           if (speedOffsetSelectIdx == 4) { isDemoModeActive = true; } 
           else { isDemoModeActive = false; currentSetupIndex = speedOffsetSelectIdx; userRestoredSetupIdx = currentSetupIndex; }
           isEditModeActive = false; 
         }
-        else if (currentPage == 4) {
+        else if (currentPage == 5) {
           userShiftPoint += 100;
           if (userShiftPoint > 15000) userShiftPoint = 5000; 
         }
-        else if (currentPage == 9) {
+        else if (currentPage == 10) {
           isSimulationActive = !isSimulationActive; 
           if (!isSimulationActive) { dragSimState = DRAG_IDLE; simStateTimer = 0; currentSetupIndex = userRestoredSetupIdx; }
         }
-        else if (currentPage == 10) { 
+        else if (currentPage == 11) { 
           if (odometerSelectRow == 0) tripA = 0.0; else if (odometerSelectRow == 1) tripB = 0.0;
         }
-        else if (currentPage == 11) { 
+        else if (currentPage == 12) { 
           lightFlashDelay -= 5;
           if (lightFlashDelay < 5) lightFlashDelay = 100;
         }
@@ -2075,9 +2528,9 @@ void loop() {
       if (millis() - lastDoublePressTime < DEBOUNCE_CUSHION) return; 
       lastActivityTime = millis(); rightButtonWasReleased = false; 
       
-      if (isEditModeActive) {
-        if (currentPage == 2) { speedOffsetSelectIdx = (speedOffsetSelectIdx + 1) % 5; }
-        else if (currentPage == 10) { odometerSelectRow = (odometerSelectRow + 1) % 2; } 
+        if (isEditModeActive) {
+        if (currentPage == 3) { speedOffsetSelectIdx = (speedOffsetSelectIdx + 1) % 5; }
+        else if (currentPage == 11) { odometerSelectRow = (odometerSelectRow + 1) % 2; } 
         else { isEditModeActive = false; }
       } else {
         currentPage = (currentPage + 1) % TOTAL_PAGES; 
