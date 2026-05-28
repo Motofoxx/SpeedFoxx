@@ -50,6 +50,28 @@ A universal motorcycle speedo correction and telemetry device built around an ES
 - Odometer, trip meters, engine hour tracking
 - Maintenance logging and reset operations
 
+## Versioning and release notes
+
+This project follows semantic versioning: `MAJOR.MINOR.PATCH`.
+
+- `MAJOR` for breaking changes and major updates
+- `MINOR` for new features and firmware improvements
+- `PATCH` for small bug fixes, UI tweaks, and documentation updates
+
+Release notes are tracked in `CHANGELOG.md`. Update that file for each new firmware release.
+
+A GitHub release workflow is configured in `.github/workflows/release.yml`. When you push a version tag like `v1.1.0`, GitHub will automatically create a release.
+
+A PR label workflow is also configured in `.github/workflows/draft-release.yml`. When a pull request is merged with one of these labels, GitHub will create a draft release for the version in `src/main.cpp`:
+
+- `release: patch`
+- `release: minor`
+- `release: major`
+
+Labels are maintained automatically from `.github/labels.yml` by the label sync workflow in `.github/workflows/label-sync.yml`.
+
+A release note template is provided at `.github/release_template.md`.
+
 ## Build and flash
 
 ```bash

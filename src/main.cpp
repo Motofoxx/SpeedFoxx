@@ -94,7 +94,7 @@ volatile unsigned long lastRpmPulseMicros = 0;
 volatile unsigned long lastRpmIntervalMicros = 0;
 
 int currentPage = 0;
-const int TOTAL_PAGES = 13; 
+const int TOTAL_PAGES = 12; 
 unsigned long lastButtonCheck = 0;
 
 // --- Advanced Menu Lock & State Variables ---
@@ -319,11 +319,6 @@ const char index_html[] PROGMEM = R"rawliteral(
         .nav-bar::-webkit-scrollbar { display: none; }
         .nav-btn { background: #1c1c24; color: #aeaeae; border: 1px solid #2c2c3c; padding: 0 14px; border-radius: 30px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; height: 36px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 88px; }
         .nav-btn.active { background: #007aff; color: #fff; border-color: #007aff; box-shadow: 0 0 10px rgba(0,122,255,0.4); }
-        .large-gear { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.95); z-index: 9999; }
-        .large-gear-value { font-weight: 900; color: #ffffff; font-size: 140px; text-align: center; }
-        .large-gear.shift { background-color: #ff3b30; color: #071007; }
-        .large-gear-value.pulse { animation: pulse 800ms ease-in-out infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.08); } 100% { transform: scale(1); } }
         .nav-center { left: 50% !important; transform: translateX(-50%) !important; justify-content: center !important; width: calc(100% - 40px) !important; }
         .version-badge { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #8e8e93; text-transform: uppercase; align-self: center; }
         .version-notes { color: #8e8e93; font-size: 12px; line-height: 1.4; margin-top: 10px; }
@@ -341,10 +336,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             <div id="page-dash" class="gauge-container">
                 <canvas id="lfaGauge" width="340" height="340"></canvas>
                 <div id="gear-tracker" class="gear-tracker"></div>
-                <div id="large-gear-overlay" class="large-gear" style="display:none;">
-                  <div id="large-gear-value" class="large-gear-value">N</div>
-                  <button class="interactive-btn" style="position:absolute;right:14px;top:12px;" onclick="toggleLargeGear(null)">Close</button>
-                </div>
+
             </div>
 
             <div id="page-control" class="sub-page">
@@ -633,7 +625,6 @@ const char index_html[] PROGMEM = R"rawliteral(
 
         <div class="nav-bar">
             <button class="nav-btn active" onclick="switchPage('dash', this)">Live Dash</button>
-          <button class="nav-btn" onclick="toggleLargeGear(this)">Large Gear</button>
             <button class="nav-btn" onclick="switchPage('clusters', this)">Clusters</button>
             <button class="nav-btn" onclick="switchPage('sprockets', this)">Sprockets</button>
             <button class="nav-btn" onclick="switchPage('control', this)">Command Panel</button>
@@ -846,31 +837,7 @@ const char index_html[] PROGMEM = R"rawliteral(
           }).join('');
         }
 
-        function toggleLargeGear(btnEl) {
-          const overlay = document.getElementById('large-gear-overlay');
-          const isOpen = overlay.style.display === 'flex';
-          if (isOpen) {
-            overlay.style.display = 'none';
-            if (btnEl) btnEl.classList.remove('active');
-          } else {
-            overlay.style.display = 'flex';
-            if (btnEl) btnEl.classList.add('active');
-            updateLargeGearDisplay();
-          }
-        }
-
-        function updateLargeGearDisplay() {
-          const overlay = document.getElementById('large-gear-overlay');
-          if (!overlay || overlay.style.display === 'none') return;
-          const val = document.getElementById('large-gear-value');
-          val.innerText = liveData.gear;
-          // reflect shift state with a class to allow CSS change
-          if (liveData.activeSim && liveData.rpm >= liveData.shift) {
-            val.classList.add('shift');
-          } else {
-            val.classList.remove('shift');
-          }
-        }
+        function updateLargeGearDisplay() {}
 
         function toggleNavCenter(checkbox) {
           const nav = document.querySelector('.nav-bar');
@@ -2113,7 +2080,7 @@ void drawHoldProgressBar(int yPos) {
 void updateDisplay() {
   display.clearDisplay();
   
-  if ((currentPage == 0 || currentPage == 1 || currentPage == 8) && isSimulationActive && currentRPM >= userShiftPoint) {
+  if ((currentPage == 0 || currentPage == 8) && isSimulationActive && currentRPM >= userShiftPoint) {
     flashInverted = !flashInverted;
     display.invertDisplay(flashInverted);
   } else {
@@ -2123,7 +2090,6 @@ void updateDisplay() {
   display.setTextSize(1); display.setTextColor(SSD1306_WHITE); display.setCursor(0, 0);
   
   if (currentPage == 0)      { display.println("CBR600RR COMPUTER"); }
-  else if (currentPage == 1) { display.println("GEAR ONLY"); }
   else if (currentPage == 2) { display.println("GEARING RATIO MATRIX"); }
   else if (currentPage == 3) { display.print("SPROCKET CONFIG "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); } 
   else if (currentPage == 4) { display.println("PERFORMANCE TIMER"); }
@@ -2152,28 +2118,6 @@ void updateDisplay() {
       display.print("RPM: "); display.print(currentRPM);
       display.setCursor(76, 53); 
       if (!isMenuUnlocked) display.print("SYS LCK");
-    }
-  } 
-  else if (currentPage == 1) {
-    // Gear-only full-screen display (large gear, optional flash on shift)
-    unsigned long t = millis();
-    bool shiftActive = (currentRPM >= userShiftPoint);
-    bool flashOn = ((t / 250) % 2) == 0;
-    if (shiftActive && flashOn) {
-      display.fillRect(0, 0, 128, 64, SSD1306_WHITE);
-      display.setTextColor(SSD1306_BLACK);
-      display.setTextSize(4);
-      display.setCursor(36, 10);
-      display.print(currentGear);
-      display.setTextSize(1);
-      display.setTextColor(SSD1306_WHITE);
-    } else {
-      display.fillRect(0, 0, 128, 64, SSD1306_BLACK);
-      display.setTextColor(SSD1306_WHITE);
-      display.setTextSize(4);
-      display.setCursor(36, 10);
-      display.print(currentGear);
-      display.setTextSize(1);
     }
   } 
   else if (currentPage == 2) { 

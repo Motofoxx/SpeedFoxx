@@ -1,0 +1,34 @@
+name: Draft Release from PR Label
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  draft_release:
+    if: github.event.pull_request.merged == true && (contains(github.event.pull_request.labels.*.name, 'release: patch') || contains(github.event.pull_request.labels.*.name, 'release: minor') || contains(github.event.pull_request.labels.*.name, 'release: major'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read firmware version
+        run: |
+          VERSION=$(grep -oP 'FIRMWARE_VERSION = "\K[0-9.]+(?=\")' src/main.cpp)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Create draft release
+        uses: actions/create-release@v1
+        with:
+          tag_name: v${{ env.VERSION }}
+          release_name: "Draft release v${{ env.VERSION }}"
+          body: |
+            Draft release created from merged PR #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}
+
+            PR description:
+            ${{ github.event.pull_request.body }}
+          draft: true
+          prerelease: false
+          target_commitish: ${{ github.event.pull_request.merge_commit_sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

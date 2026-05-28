@@ -16,6 +16,7 @@ What does this PR change? Please provide a brief summary.
 - [ ] I have tested the changes locally.
 - [ ] I have updated documentation if necessary.
 - [ ] I have linked any related issues.
+- [ ] If this PR is a release candidate, add one of these labels: `release: patch`, `release: minor`, `release: major`.
 
 ## Details
 

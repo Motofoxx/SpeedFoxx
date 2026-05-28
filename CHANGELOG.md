@@ -1,13 +1,24 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project are documented in this file.
+
+## Versioning
+
+- `MAJOR.MINOR.PATCH`
+- `MAJOR` increments for breaking changes or major rewrites.
+- `MINOR` increments for new features and firmware improvements.
+- `PATCH` increments for small fixes, tuning, and documentation updates.
 
 ## [Unreleased]
 
-- Added GitHub repository documentation (`README.md`, `docs/HARDWARE.md`).
-- Added `CONTRIBUTING.md` and `CHANGELOG.md`.
-- Added hardware input handling and corrected speed output support in firmware.
-- Implemented ESP32 interrupt-based speed/RPM measurement and web portal telemetry.
+- Track patch-level updates here until the next release is tagged.
+
+## [1.1.0] - 2026-05-26
+
+- Updated firmware metadata to author `Motofoxx` and current date.
+- Added version tracking guidance and semantic versioning policy.
+- Removed the screen calibration OLED page and related calibration handler code.
+- Kept core speed correction and telemetry firmware intact.
 
 ## [0.1.0] - Initial release
 
