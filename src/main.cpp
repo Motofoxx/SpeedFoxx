@@ -519,7 +519,8 @@ const char index_html[] PROGMEM = R"rawliteral(
                     <div class="control-section">
                         <div class="cluster-group-title">Generic / Extras</div>
                         <div class="layout-grid">
-                            <div class="layout-card" id="lay-gsxr25" onclick="setLayout('gsxr25')">'25 GSX-R<span class="layout-tag">Generic</span></div>
+                            <div class="layout-card" id="lay-jetcockpit" onclick="setLayout('jetcockpit')">Jet Cockpit<span class="layout-tag">Aviation</span></div>
+                        <div class="layout-card" id="lay-gsxr25" onclick="setLayout('gsxr25')">'25 GSX-R<span class="layout-tag">Generic</span></div>
                             <div class="layout-card" id="lay-zx10r26" onclick="setLayout('zx10r26')">'26 ZX-10R<span class="layout-tag">Generic</span></div>
                             <div class="layout-card" id="lay-lfa" onclick="setLayout('lfa')">LFA Pod<span class="layout-tag">Extra</span></div>
                             <div class="layout-card" id="lay-s2000" onclick="setLayout('s2000')">S2000 Peak<span class="layout-tag">Extra</span></div>
@@ -1102,6 +1103,181 @@ const char index_html[] PROGMEM = R"rawliteral(
             ctx.fillText('MODE', cx - 80, cy + 65);
         }
 
+        // --- JET COCKPIT: Fighter Jet HUD & Analog Hybrid ---
+        function renderJetCockpit() {
+            // Dark cockpit background
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, 340, 340);
+
+            // HUD frame - angular military aesthetic
+            ctx.strokeStyle = '#00ff7f';
+            ctx.lineWidth = 2;
+            // Top left corner
+            ctx.beginPath();
+            ctx.moveTo(20, 50); ctx.lineTo(50, 50); ctx.moveTo(20, 50); ctx.lineTo(20, 80);
+            ctx.stroke();
+            // Top right corner
+            ctx.beginPath();
+            ctx.moveTo(320, 50); ctx.lineTo(290, 50); ctx.moveTo(320, 50); ctx.lineTo(320, 80);
+            ctx.stroke();
+            // Bottom corners
+            ctx.beginPath();
+            ctx.moveTo(20, 320); ctx.lineTo(50, 320); ctx.moveTo(20, 320); ctx.lineTo(20, 290);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(320, 320); ctx.lineTo(290, 320); ctx.moveTo(320, 320); ctx.lineTo(320, 290);
+            ctx.stroke();
+
+            // Left Airspeed Dial (Speed indicator)
+            const leftX = 80, leftY = 140, leftR = 55;
+            ctx.fillStyle = '#1a1a2e';
+            ctx.beginPath();
+            ctx.arc(leftX, leftY, leftR, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.strokeStyle = '#00ff7f';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Speed dial markings
+            ctx.strokeStyle = '#00ff7f';
+            for (let i = 0; i <= 180; i += 10) {
+                const angle = Math.PI - (i / 180) * Math.PI;
+                const x1 = leftX + leftR * Math.cos(angle);
+                const y1 = leftY - leftR * Math.sin(angle);
+                const x2 = leftX + (leftR - 8) * Math.cos(angle);
+                const y2 = leftY - (leftR - 8) * Math.sin(angle);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+
+            // Speed needle
+            const speedRatio = Math.min(renderMph, 150) / 150;
+            const speedAngle = Math.PI - (speedRatio * Math.PI);
+            ctx.strokeStyle = '#ff3b30';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(leftX, leftY);
+            ctx.lineTo(leftX + (leftR - 12) * Math.cos(speedAngle), leftY - (leftR - 12) * Math.sin(speedAngle));
+            ctx.stroke();
+
+            // Speed numerals
+            ctx.fillStyle = '#00ff7f';
+            ctx.font = 'bold 9px monospace';
+            ctx.textAlign = 'center';
+            for (let i = 0; i <= 150; i += 30) {
+                const ratio = i / 150;
+                const angle = Math.PI - (ratio * Math.PI);
+                ctx.fillText(i, leftX + (leftR - 22) * Math.cos(angle), leftY - (leftR - 22) * Math.sin(angle) + 3);
+            }
+
+            // Right Tachometer Dial (RPM indicator)
+            const rightX = 260, rightY = 140, rightR = 55;
+            ctx.fillStyle = '#1a1a2e';
+            ctx.beginPath();
+            ctx.arc(rightX, rightY, rightR, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.strokeStyle = '#00ff7f';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // RPM dial markings
+            ctx.strokeStyle = '#00ff7f';
+            for (let i = 0; i <= 180; i += 10) {
+                const angle = Math.PI - (i / 180) * Math.PI;
+                const x1 = rightX + rightR * Math.cos(angle);
+                const y1 = rightY - rightR * Math.sin(angle);
+                const x2 = rightX + (rightR - 8) * Math.cos(angle);
+                const y2 = rightY - (rightR - 8) * Math.sin(angle);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+
+            // RPM needle - red zone at end
+            const rpmRatio = Math.min(renderRpm, 15000) / 15000;
+            const rpmAngle = Math.PI - (rpmRatio * Math.PI);
+            ctx.strokeStyle = (renderRpm >= liveData.shift) ? '#ff3b30' : '#00ff7f';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(rightX, rightY);
+            ctx.lineTo(rightX + (rightR - 12) * Math.cos(rpmAngle), rightY - (rightR - 12) * Math.sin(rpmAngle));
+            ctx.stroke();
+
+            // RPM numerals
+            ctx.fillStyle = '#00ff7f';
+            ctx.font = 'bold 9px monospace';
+            ctx.textAlign = 'center';
+            for (let i = 0; i <= 15; i += 3) {
+                const ratio = i / 15;
+                const angle = Math.PI - (ratio * Math.PI);
+                ctx.fillText(i + 'k', rightX + (rightR - 22) * Math.cos(angle), rightY - (rightR - 22) * Math.sin(angle) + 3);
+            }
+
+            // Center HUD Digital Display
+            ctx.fillStyle = '#00ff7f';
+            ctx.font = 'bold 56px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(Math.round(renderMph), 170, 250);
+            ctx.font = 'bold 14px sans-serif';
+            ctx.fillText('VELOCITY', 170, 270);
+
+            // Gear indicator - Top center
+            ctx.fillStyle = (liveData.gear === 'N') ? '#34c759' : '#00ff7f';
+            ctx.font = 'bold 32px monospace';
+            ctx.fillText(liveData.gear, 170, 60);
+            ctx.fillStyle = '#8e8e93';
+            ctx.font = '10px sans-serif';
+            ctx.fillText('GEAR', 170, 75);
+
+            // Shift warning indicator - Bottom center
+            if (liveData.activeSim && liveData.rpm >= liveData.shift) {
+                ctx.fillStyle = '#ff3b30';
+                ctx.font = 'bold 14px monospace';
+                ctx.fillText('!SHIFT NOW!', 170, 310);
+                // Pulse effect indicator
+                ctx.strokeStyle = '#ff3b30';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(145, 295, 50, 20);
+            } else {
+                ctx.fillStyle = '#2a2a35';
+                ctx.font = 'bold 12px monospace';
+                ctx.fillText('READY', 170, 310);
+            }
+
+            // Left side indicator - Odometer
+            ctx.fillStyle = '#00ff7f';
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText('ODO:', 20, 310);
+            ctx.fillText(liveData.odo.toFixed(1), 20, 325);
+
+            // Right side indicator - Temperature/Status
+            ctx.fillStyle = '#00ff7f';
+            ctx.textAlign = 'right';
+            ctx.fillText('STATUS:', 320, 310);
+            ctx.fillText((liveData.activeSim ? 'SIM' : 'READY'), 320, 325);
+
+            // Target reticles - corners
+            ctx.strokeStyle = '#00ff7f';
+            ctx.lineWidth = 1;
+            const reticleSize = 8;
+            ctx.beginPath();
+            ctx.arc(30, 30, reticleSize, 0, 2 * Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(310, 30, reticleSize, 0, 2 * Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(30, 310, reticleSize, 0, 2 * Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(310, 310, reticleSize, 0, 2 * Math.PI);
+            ctx.stroke();
+        }
+
         // --- LEGACY DASHBOARDS ---
         function renderLFAPod() {
             ctx.beginPath();
@@ -1228,7 +1404,8 @@ const char index_html[] PROGMEM = R"rawliteral(
             if (isOverrev) masterPanel.classList.add('shift-flash-active');
             else masterPanel.classList.remove('shift-flash-active');
 
-            if(currentLayout === 'gsxr25') renderGSXR2025();
+            if(currentLayout === 'jetcockpit') renderJetCockpit();
+            else if(currentLayout === 'gsxr25') renderGSXR2025();
             else if(currentLayout === 'zx10r26') renderZX10R2026();
             else if(currentLayout === 'lfa') renderLFAPod();
             else if(currentLayout === 's2000') renderS2000Dash();
