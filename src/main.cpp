@@ -315,7 +315,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         input:checked + .slider { background-color: #34c759; }
         input:checked + .slider:before { transform: translateX(22px); }
         
-        .nav-bar { display: flex; position: absolute; bottom: 12px; left: 20px; right: 20px; gap: 8px; scrollbar-width: none; min-height: 44px; overflow-x: auto; -webkit-overflow-scrolling: touch; justify-content: flex-start; }
+        .nav-bar { display: flex; position: absolute; bottom: 12px; left: 20px; right: 20px; gap: 8px; scrollbar-width: none; min-height: 44px; overflow-x: auto; -webkit-overflow-scrolling: touch; justify-content: center; }
         .nav-bar::-webkit-scrollbar { display: none; }
         .nav-btn { background: #1c1c24; color: #aeaeae; border: 1px solid #2c2c3c; padding: 0 14px; border-radius: 30px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; height: 36px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 88px; }
         .nav-btn.active { background: #007aff; color: #fff; border-color: #007aff; box-shadow: 0 0 10px rgba(0,122,255,0.4); }
