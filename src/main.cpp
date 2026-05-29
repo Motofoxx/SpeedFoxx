@@ -2344,7 +2344,7 @@ void drawHoldProgressBar(int yPos) {
 void updateDisplay() {
   display.clearDisplay();
   
-  if ((currentPage == 0 || currentPage == 8) && isSimulationActive && currentRPM >= userShiftPoint) {
+  if ((currentPage == 0 || currentPage == 7) && isSimulationActive && currentRPM >= userShiftPoint) {
     flashInverted = !flashInverted;
     display.invertDisplay(flashInverted);
   } else {
@@ -2354,17 +2354,17 @@ void updateDisplay() {
   display.setTextSize(1); display.setTextColor(SSD1306_WHITE); display.setCursor(0, 0);
   
   if (currentPage == 0)      { display.println("CBR600RR COMPUTER"); }
-  else if (currentPage == 2) { display.println("GEARING RATIO MATRIX"); }
-  else if (currentPage == 3) { display.print("SPROCKET CONFIG "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); } 
-  else if (currentPage == 4) { display.println("PERFORMANCE TIMER"); }
-  else if (currentPage == 5) { display.print("SHIFT POINT "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
-  else if (currentPage == 6) { display.print("MAINTENANCE LOG "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
-  else if (currentPage == 7) { display.println("WI-FI NETWORK PORTAL"); } 
-  else if (currentPage == 8) { display.println("PERSONAL BESTS"); } 
-  else if (currentPage == 9) { display.println("SIMULATION DEMO"); }
-  else if (currentPage == 10){ display.print("SIMULATION CORE "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
-  else if (currentPage == 11){ display.print("ODOMETER "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
-  else if (currentPage == 12){ display.print("SHIFT LIGHTS "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
+  else if (currentPage == 1) { display.println("GEARING RATIO MATRIX"); }
+  else if (currentPage == 2) { display.print("SPROCKET CONFIG "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); } 
+  else if (currentPage == 3) { display.println("PERFORMANCE TIMER"); }
+  else if (currentPage == 4) { display.print("SHIFT POINT "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
+  else if (currentPage == 5) { display.print("MAINTENANCE LOG "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
+  else if (currentPage == 6) { display.println("WI-FI NETWORK PORTAL"); } 
+  else if (currentPage == 7) { display.println("PERSONAL BESTS"); } 
+  else if (currentPage == 8) { display.println("SIMULATION DEMO"); }
+  else if (currentPage == 9){ display.print("SIMULATION CORE "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
+  else if (currentPage == 10){ display.print("ODOMETER "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
+  else if (currentPage == 11){ display.print("SHIFT LIGHTS "); display.println(isEditModeActive ? "[EDIT]" : "[NAV]"); }
   
   display.drawFastHLine(0, 10, 128, SSD1306_WHITE); 
 
@@ -2384,8 +2384,8 @@ void updateDisplay() {
       if (!isMenuUnlocked) display.print("SYS LCK");
     }
   } 
-  else if (currentPage == 2) { 
-    // GEARING RATIO MATRIX (moved to page 2)
+  else if (currentPage == 1) { 
+    // GEARING RATIO MATRIX
     display.setCursor(0, 20);
     display.println("S1: 15/43 Ratio: 2.86");
     display.println("S2: 15/45 Ratio: 3.00");
@@ -2398,7 +2398,7 @@ void updateDisplay() {
        display.print("ACTIVE PROFILE S"); display.print(currentSetupIndex + 1);
     }
   } 
-  else if (currentPage == 3) { 
+  else if (currentPage == 2) { 
     if (isHoldingUnlockButton && !isEditModeActive) {
       display.setCursor(0, 22); display.println("Entering Setup...");
       drawHoldProgressBar(42);
@@ -2422,7 +2422,7 @@ void updateDisplay() {
       }
     }
   }
-  else if (currentPage == 4) {
+  else if (currentPage == 3) {
     display.setCursor(0, 16);
     if (currentTimerState == READY_TO_LAUNCH) {
       display.println("Status: BEST RECORDS");
@@ -2448,7 +2448,7 @@ void updateDisplay() {
       display.print("Trap Speed: "); display.print(speedQuarterMile); display.println(" MPH");
     }
   }
-  else if (currentPage == 5) {
+  else if (currentPage == 4) {
     if (isHoldingUnlockButton && !isEditModeActive) {
       display.setCursor(0, 22); display.println("Opening Config...");
       drawHoldProgressBar(42);
@@ -2461,7 +2461,7 @@ void updateDisplay() {
       else display.println("[Top] +100 | [Right] Exit");
     }
   }
-  else if (currentPage == 6) {
+  else if (currentPage == 5) {
     if (isHoldingUnlockButton && !isEditModeActive) {
       display.setCursor(0, 22); display.println("Accessing Engine...");
       drawHoldProgressBar(42);
@@ -2488,13 +2488,13 @@ void updateDisplay() {
       display.print("Hold Top to Configure");
     }
   }
-  else if (currentPage == 7) {
+  else if (currentPage == 6) {
     display.setCursor(0, 18); 
     display.print("SSID:"); display.println(ssid); 
     display.print("IP:   192.168.4.1");
     display.print("Port: 80 (Active)");
   }
-  else if (currentPage == 8) {
+  else if (currentPage == 7) {
     display.setCursor(0, 16);
     display.print("Max Speed:  "); display.print(maxRecordedSpeed); display.println(" MPH");
     display.print("Max RPM:    "); display.print(maxRecordedRPM); display.println(" RPM");
@@ -2502,7 +2502,7 @@ void updateDisplay() {
     display.print("Best 0-100: "); display.print(best0To100, 2); display.println(" s");
     display.print("Best 1/4M:  "); display.print(bestQuarterMile, 2); display.println(" s");
   }
-  else if (currentPage == 9) {
+  else if (currentPage == 8) {
     display.setCursor(0, 16);
     display.print("Profile: "); 
     if (isDemoModeActive) display.print("[D] ");
@@ -2521,7 +2521,7 @@ void updateDisplay() {
     display.print("RPM: "); display.print(currentRPM); display.print(" G: "); display.println(currentGear);
     display.print("Speed: "); display.print(currentMPH); display.println(" MPH");
   }
-  else if (currentPage == 10) {
+  else if (currentPage == 9) {
     if (isHoldingUnlockButton && !isEditModeActive) {
       display.setCursor(0, 22); display.println("Opening Core Logic...");
       drawHoldProgressBar(42);
@@ -2534,7 +2534,7 @@ void updateDisplay() {
       else display.println("[Top] Toggle | [Right] Exit");
     }
   }
-  else if (currentPage == 11) { 
+  else if (currentPage == 10) { 
     if (isHoldingUnlockButton && !isEditModeActive) {
       display.setCursor(0, 22); display.println("Opening Registers...");
       drawHoldProgressBar(42);
@@ -2549,7 +2549,7 @@ void updateDisplay() {
       else display.println("[Top] Reset | [Right] Swap");
     }
   }
-  else if (currentPage == 12) { 
+  else if (currentPage == 11) { 
     if (isHoldingUnlockButton && !isEditModeActive) {
       display.setCursor(0, 22); display.println("Opening Timers...");
       drawHoldProgressBar(42);
@@ -2648,7 +2648,7 @@ void loop() {
         isHoldingUnlockButton = true;
         buttonHoldStartTime = millis();
       } else if (millis() - buttonHoldStartTime >= UNLOCK_HOLD_TIME) {
-        isMenuUnlocked = true; isHoldingUnlockButton = false; currentPage = 2; 
+        isMenuUnlocked = true; isHoldingUnlockButton = false; currentPage = 1; 
         topButtonWasReleased = false; rightButtonWasReleased = false;
         lastActivityTime = millis(); delay(300);
       }
@@ -2660,7 +2660,7 @@ void loop() {
 
   if (isMenuUnlocked && (millis() - lastButtonCheck > 50)) {
      if (!isEditModeActive && topBtnPressed && topButtonWasReleased && 
-       (currentPage == 3 || currentPage == 5 || currentPage == 6 || currentPage == 10 || currentPage == 11 || currentPage == 12)) {
+       (currentPage == 2 || currentPage == 4 || currentPage == 5 || currentPage == 9 || currentPage == 10 || currentPage == 11)) {
       
       if (!isHoldingUnlockButton) {
         isHoldingUnlockButton = true;
@@ -2671,8 +2671,8 @@ void loop() {
         topButtonWasReleased = false; 
         lastActivityTime = millis();
         
-        if (currentPage == 3) speedOffsetSelectIdx = isDemoModeActive ? 4 : currentSetupIndex;
-        if (currentPage == 11) odometerSelectRow = 0;
+        if (currentPage == 2) speedOffsetSelectIdx = isDemoModeActive ? 4 : currentSetupIndex;
+        if (currentPage == 10) odometerSelectRow = 0;
         delay(300);
       }
       return; 
@@ -2708,23 +2708,23 @@ void loop() {
       lastActivityTime = millis(); topButtonWasReleased = false; 
       
       if (isEditModeActive) {
-        if (currentPage == 3) { 
+        if (currentPage == 2) { 
           if (speedOffsetSelectIdx == 4) { isDemoModeActive = true; } 
           else { isDemoModeActive = false; currentSetupIndex = speedOffsetSelectIdx; userRestoredSetupIdx = currentSetupIndex; }
           isEditModeActive = false; 
         }
-        else if (currentPage == 5) {
+        else if (currentPage == 4) {
           userShiftPoint += 100;
           if (userShiftPoint > 15000) userShiftPoint = 5000; 
         }
-        else if (currentPage == 10) {
+        else if (currentPage == 9) {
           isSimulationActive = !isSimulationActive; 
           if (!isSimulationActive) { dragSimState = DRAG_IDLE; simStateTimer = 0; currentSetupIndex = userRestoredSetupIdx; }
         }
-        else if (currentPage == 11) { 
+        else if (currentPage == 10) { 
           if (odometerSelectRow == 0) tripA = 0.0; else if (odometerSelectRow == 1) tripB = 0.0;
         }
-        else if (currentPage == 12) { 
+        else if (currentPage == 11) { 
           lightFlashDelay -= 5;
           if (lightFlashDelay < 5) lightFlashDelay = 100;
         }
@@ -2737,8 +2737,8 @@ void loop() {
       lastActivityTime = millis(); rightButtonWasReleased = false; 
       
         if (isEditModeActive) {
-        if (currentPage == 3) { speedOffsetSelectIdx = (speedOffsetSelectIdx + 1) % 5; }
-        else if (currentPage == 11) { odometerSelectRow = (odometerSelectRow + 1) % 2; } 
+        if (currentPage == 2) { speedOffsetSelectIdx = (speedOffsetSelectIdx + 1) % 5; }
+        else if (currentPage == 10) { odometerSelectRow = (odometerSelectRow + 1) % 2; } 
         else { isEditModeActive = false; }
       } else {
         currentPage = (currentPage + 1) % TOTAL_PAGES; 
