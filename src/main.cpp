@@ -520,7 +520,8 @@ const char index_html[] PROGMEM = R"rawliteral(
                         <div class="cluster-group-title">Generic / Extras</div>
                         <div class="layout-grid">
                             <div class="layout-card" id="lay-jetcockpit" onclick="setLayout('jetcockpit')">Jet Cockpit<span class="layout-tag">Aviation</span></div>
-                        <div class="layout-card" id="lay-gsxr25" onclick="setLayout('gsxr25')">'25 GSX-R<span class="layout-tag">Generic</span></div>
+                            <div class="layout-card" id="lay-avanalog" onclick="setLayout('avanalog')">Analog Panel<span class="layout-tag">Aviation</span></div>
+                        <div class="layout-card" id="lay-gsxr25" onclick="setLayout('gsxr25')">'25 GSX-R<span class="layout-tag">Generic</span></div>25 GSX-R<span class="layout-tag">Generic</span></div>
                             <div class="layout-card" id="lay-zx10r26" onclick="setLayout('zx10r26')">'26 ZX-10R<span class="layout-tag">Generic</span></div>
                             <div class="layout-card" id="lay-lfa" onclick="setLayout('lfa')">LFA Pod<span class="layout-tag">Extra</span></div>
                             <div class="layout-card" id="lay-s2000" onclick="setLayout('s2000')">S2000 Peak<span class="layout-tag">Extra</span></div>
@@ -1278,7 +1279,225 @@ const char index_html[] PROGMEM = R"rawliteral(
             ctx.stroke();
         }
 
-        // --- LEGACY DASHBOARDS ---
+        // --- CLASSIC AVIATION ANALOG: Traditional Instrument Panel ---
+        function renderAviationAnalog() {
+            // Dark panel background
+            ctx.fillStyle = '#0d0d15';
+            ctx.fillRect(0, 0, 340, 340);
+
+            // Panel frame
+            ctx.strokeStyle = '#ccb896';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(15, 15, 310, 310);
+            ctx.strokeStyle = '#4a4a52';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(18, 18, 304, 304);
+
+            // Top speed indicator (large vertical gauge style)
+            const speedX = 85, speedY = 90;
+            ctx.fillStyle = '#1a1a25';
+            ctx.beginPath();
+            ctx.arc(speedX, speedY, 52, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.strokeStyle = '#ccb896';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Speed arc from -90 to 90 degrees (left to right vertical sweep)
+            for (let i = 0; i <= 180; i += 15) {
+                const angle = (270 + i) * Math.PI / 180;
+                ctx.strokeStyle = (i > 140) ? '#d32f2f' : '#ccb896';
+                ctx.lineWidth = (i % 30 === 0) ? 3 : 1;
+                const r = 52;
+                const x1 = speedX + r * Math.cos(angle);
+                const y1 = speedY + r * Math.sin(angle);
+                const x2 = speedX + (r - 10) * Math.cos(angle);
+                const y2 = speedY + (r - 10) * Math.sin(angle);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+
+            // Speed needle (thin and elegant)
+            const speedRatio = Math.min(renderMph, 160) / 160;
+            const speedAngle = (270 + speedRatio * 180) * Math.PI / 180;
+            ctx.strokeStyle = '#ff6b6b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(speedX, speedY);
+            ctx.lineTo(speedX + 40 * Math.cos(speedAngle), speedY + 40 * Math.sin(speedAngle));
+            ctx.stroke();
+
+            // Speed numerals
+            ctx.fillStyle = '#ccb896';
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i <= 160; i += 40) {
+                const ratio = i / 160;
+                const angle = (270 + ratio * 180) * Math.PI / 180;
+                ctx.fillText(i, speedX + 32 * Math.cos(angle), speedY + 32 * Math.sin(angle));
+            }
+            ctx.fillStyle = '#8e8e93';
+            ctx.font = 'bold 8px sans-serif';
+            ctx.fillText('AIRSPEED', speedX, speedY + 65);
+
+            // RPM indicator (right side, vertical)
+            const rpmX = 255, rpmY = 90;
+            ctx.fillStyle = '#1a1a25';
+            ctx.beginPath();
+            ctx.arc(rpmX, rpmY, 52, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.strokeStyle = '#ccb896';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // RPM arc
+            for (let i = 0; i <= 180; i += 15) {
+                const angle = (270 + i) * Math.PI / 180;
+                ctx.strokeStyle = (i > 140) ? '#d32f2f' : '#ccb896';
+                ctx.lineWidth = (i % 30 === 0) ? 3 : 1;
+                const r = 52;
+                const x1 = rpmX + r * Math.cos(angle);
+                const y1 = rpmY + r * Math.sin(angle);
+                const x2 = rpmX + (r - 10) * Math.cos(angle);
+                const y2 = rpmY + (r - 10) * Math.sin(angle);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+
+            // RPM needle
+            const rpmRatio = Math.min(renderRpm, 16000) / 16000;
+            const rpmAngle = (270 + rpmRatio * 180) * Math.PI / 180;
+            ctx.strokeStyle = (renderRpm >= liveData.shift) ? '#ff3b30' : '#ffb81c';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(rpmX, rpmY);
+            ctx.lineTo(rpmX + 40 * Math.cos(rpmAngle), rpmY + 40 * Math.sin(rpmAngle));
+            ctx.stroke();
+
+            // RPM numerals
+            ctx.fillStyle = '#ccb896';
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i <= 16; i += 4) {
+                const ratio = i / 16;
+                const angle = (270 + ratio * 180) * Math.PI / 180;
+                ctx.fillText(i, rpmX + 32 * Math.cos(angle), rpmY + 32 * Math.sin(angle));
+            }
+            ctx.fillStyle = '#8e8e93';
+            ctx.font = 'bold 8px sans-serif';
+            ctx.fillText('TACHOMETER', rpmX, rpmY + 65);
+
+            // Gear indicator - center top (drum style)
+            ctx.fillStyle = '#1a1a25';
+            ctx.fillRect(150, 35, 40, 30);
+            ctx.strokeStyle = '#ccb896';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(150, 35, 40, 30);
+            ctx.fillStyle = (liveData.gear === 'N') ? '#34c759' : '#ffb81c';
+            ctx.font = 'bold 22px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(liveData.gear, 170, 50);
+
+            // Vertical speed indicator (left lower)
+            const vsX = 85, vsY = 240;
+            ctx.fillStyle = '#1a1a25';
+            ctx.beginPath();
+            ctx.arc(vsX, vsY, 48, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.strokeStyle = '#ccb896';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // VS needle (rate-of-change style, ±6 range)
+            ctx.fillStyle = '#ccb896';
+            ctx.font = 'bold 8px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i <= 180; i += 20) {
+                const angle = (270 + i) * Math.PI / 180;
+                ctx.strokeStyle = '#ccb896';
+                ctx.lineWidth = (i % 60 === 0) ? 2 : 1;
+                const r = 48;
+                const x1 = vsX + r * Math.cos(angle);
+                const y1 = vsY + r * Math.sin(angle);
+                const x2 = vsX + (r - 8) * Math.cos(angle);
+                const y2 = vsY + (r - 8) * Math.sin(angle);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+
+            ctx.fillText('VS FT/MIN', vsX, vsY + 60);
+
+            // Engine Temperature gauge (right lower)
+            const tempX = 255, tempY = 240;
+            ctx.fillStyle = '#1a1a25';
+            ctx.beginPath();
+            ctx.arc(tempX, tempY, 48, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.strokeStyle = '#ccb896';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Temp gauge arc
+            for (let i = 0; i <= 180; i += 20) {
+                const angle = (270 + i) * Math.PI / 180;
+                const temp = (i / 180) * 120; // 0-120°
+                ctx.strokeStyle = (temp > 100) ? '#d32f2f' : '#ccb896';
+                ctx.lineWidth = (i % 60 === 0) ? 2 : 1;
+                const r = 48;
+                const x1 = tempX + r * Math.cos(angle);
+                const y1 = tempY + r * Math.sin(angle);
+                const x2 = tempX + (r - 8) * Math.cos(angle);
+                const y2 = tempY + (r - 8) * Math.sin(angle);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+
+            // Temp needle (simulated at 72°)
+            const tempRatio = 0.6; // Simulated
+            const tempAngle = (270 + tempRatio * 180) * Math.PI / 180;
+            ctx.strokeStyle = '#ffb81c';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(tempX, tempY);
+            ctx.lineTo(tempX + 38 * Math.cos(tempAngle), tempY + 38 * Math.sin(tempAngle));
+            ctx.stroke();
+
+            ctx.fillStyle = '#8e8e93';
+            ctx.font = 'bold 8px sans-serif';
+            ctx.fillText('TEMP °C', tempX, tempY + 60);
+
+            // Center digital readout
+            ctx.fillStyle = '#ffb81c';
+            ctx.font = 'bold 48px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(Math.round(renderMph), 170, 180);
+            ctx.fillStyle = '#8e8e93';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.fillText('VELOCITY MPH', 170, 205);
+
+            // Status indicator bar at bottom
+            ctx.fillStyle = '#1a1a25';
+            ctx.fillRect(30, 310, 280, 20);
+            ctx.strokeStyle = '#ccb896';
+            ctx.strokeRect(30, 310, 280, 20);
+            ctx.fillStyle = (liveData.activeSim && liveData.rpm >= liveData.shift) ? '#ff3b30' : '#34c759';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText((liveData.activeSim && liveData.rpm >= liveData.shift) ? 'SHIFT' : 'OK', 170, 320);
+        }
         function renderLFAPod() {
             ctx.beginPath();
             const cx = 170, cy = 170, r = 145;
@@ -1405,6 +1624,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             else masterPanel.classList.remove('shift-flash-active');
 
             if(currentLayout === 'jetcockpit') renderJetCockpit();
+            else if(currentLayout === 'avanalog') renderAviationAnalog();
             else if(currentLayout === 'gsxr25') renderGSXR2025();
             else if(currentLayout === 'zx10r26') renderZX10R2026();
             else if(currentLayout === 'lfa') renderLFAPod();
